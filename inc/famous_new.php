@@ -44,34 +44,33 @@ function famous_new() {
 			$author = stripslashes($author);
 		}	
 		
-		//insert the quote into the database!!
-		$sql = "insert into " . WP_FAMOUS_QUOTES_TABLE
-		. " set `quote`='" . $quote
-		. "', `author`='" . $author
-		. "'";	    
-		$wpdb->get_results($sql);
+		//insert quote and author to back-end Symfony
+		$curl = curl_init();
+		//Set some options
+		curl_setopt_array($curl, array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_URL => '127.0.0.1:8000/quote',
+			CURLOPT_POST => 1,
+			CURLOPT_POSTFIELDS => array(
+				authorName => $author,
+				quoteContent => $quote
+			)
+		));
 
-		//check: go and get the quote just inserted
-		$sql2 = "select `quoteID` from " . WP_FAMOUS_QUOTES_TABLE
-		. " where `quote`='" . $quote
-		. "' and `author`='" . $author
-		. "' limit 1";
-		$result = $wpdb->get_results($sql2);
-		
+		$resp = curl_exec($curl);
+
+		curl_close($curl);
+		$resp = json_decode($resp);
+
 		//failure message
-		if ( empty($result) || empty($result[0]->quoteID) )	{
+		if ( !empty($resp->status) && $resp->status != 'success' )	{
 			?><div class="error fade"><p><?php _e('<strong>Failure:</strong> Something went wrong when trying to insert the quote. Try again?',
 			'famous-quotes'); ?></p></div><?php				
 		}
 			
 		//success message
 		else {
-			?><div class="updated fade"><p><?php 
-			
-			$search = array("%s1", "%s2");
-			$replace = array($result[0]->quoteID, get_option("siteurl").'/wp-admin/admin.php?page=famous_manage');
-			echo str_replace($search,$replace,__(
-			'Quote no. <strong>%s1</strong> was added to the database. To insert it in a post use: <code>[famous-id id=%s1]</code>. To review use the <a href="%s2">Manage page</a>.'.$plusmessage,'famous-quotes')); ?></p></div><?php			
+			?><div class="updated fade"><p>New Quote Added.</p></div><?php			
 		}
 	
 	}

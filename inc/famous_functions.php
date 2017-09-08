@@ -385,15 +385,19 @@ function get_famous_quotes($categories=NULL,$sequence=NULL,$linkphrase=NULL,$mul
 			$output .= $afterloader;			
 		}
 		*/
+	//get Random Quote
+	$curl = curl_init();
+	curl_setopt_array($curl, array(
+		CURLOPT_RETURNTRANSFER => 1,
+		CURLOPT_URL => '127.0.0.1:8000/quoteRandom'
+	));
 
-	$sql = "SELECT `quoteID`,`quote`,`author` FROM `" . WP_FAMOUS_QUOTES_TABLE ."`" ;
+	$resp = curl_exec($curl);
 
-	$result = $wpdb->get_results($sql);
-	$totalquotes = count($result)-1;
+	curl_close($curl);
 
-	$sequence = mt_rand(0, $totalquotes);
-	$get_one = $result[$sequence];
-	$output = famous_output_one($get_one);
+	$quote = json_decode($resp);
+	$output = famous_output_one($quote);
 	return $output;
 }
 
@@ -494,11 +498,11 @@ function famous_output_one($get_one,$multi=NULL,$disableaspect=NULL) {
 	$output = '';	
 		
 	//make or not the author link
-	if ( $get_one->author ) {
+	if ( $get_one->author->authorName ) {
 		if ( !$linkto || preg_match("/^[a-zA-Z]+[:\/\/]+[A-Za-z0-9\-_]+\\.+[A-Za-z0-9\.\/%&=\?\-_]+$/i",$get_one->author) )
-			$Author = $get_one->author;
+			$Author = $get_one->author->authorName;
 		else {
-			$Author = $get_one->author;
+			$Author = $get_one->author->authorName;
 			if ($authorspaces)$Author =str_replace(" ",$authorspaces,$Author);
 			
 			$search = array('"', '&', '%AUTHOR%');
@@ -506,7 +510,7 @@ function famous_output_one($get_one,$multi=NULL,$disableaspect=NULL) {
 			$linkto = str_replace($search,$replace,$linkto);
 			
 			/*$linkto = str_replace('%AUTHOR%',$Author,$linkto);*/
-			$Author = '<a href="'.$linkto.'">' . $get_one->author . '</a>';
+			$Author = '<a href="'.$linkto.'">' . $get_one->author->authorName . '</a>';
 		}
 	}
 	
@@ -532,7 +536,7 @@ function famous_output_one($get_one,$multi=NULL,$disableaspect=NULL) {
 		$output .= $beforeAll;
 		
 		//if author
-		if ( !empty($get_one->author) ) {
+		if ( !empty($get_one->author->authorName) ) {
 			$output .= $beforeAuthor . $Author . $afterAuthor;
 			//source values if there is an author
 			if ( !empty($get_one->source) ) {
@@ -545,7 +549,7 @@ function famous_output_one($get_one,$multi=NULL,$disableaspect=NULL) {
 			}				
 		}
 
-		$output .= $beforeQuote . nl2br($get_one->quote) . $afterQuote;			
+		$output .= $beforeQuote . nl2br($get_one->quoteContent) . $afterQuote;			
 		$output .= $afterAll;		
 	}
 	
@@ -553,9 +557,9 @@ function famous_output_one($get_one,$multi=NULL,$disableaspect=NULL) {
 	else {	
 		
 		$output .= $beforeAll;		
-		$output .= $beforeQuote . nl2br($get_one->quote) . $afterQuote;
+		$output .= $beforeQuote . nl2br($get_one->quoteContent) . $afterQuote;
 		//if author
-		if ( !empty($get_one->author) ) {
+		if ( !empty($get_one->author->authorName) ) {
 			$output .= $beforeAuthor . $Author . $afterAuthor;
 			//source values if there is an author
 			if ( !empty($get_one->source) ) {

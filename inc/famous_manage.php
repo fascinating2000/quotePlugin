@@ -71,7 +71,6 @@ function famous_manage() {
 	
 	//action: edit the quote
 	if ( $action == 'edit' ) {
-
 		?><div class="wrap"><h2><?php _e('Edit quote '.$quoteID, 'famous-quotes') ?></h2><?php 
 		//check if something went wrong with quote id
 		if ( empty($quoteID) ) {
@@ -81,18 +80,27 @@ function famous_manage() {
 		else {			
 			
 			//query
-			$data = $wpdb->get_results("select * from " . WP_FAMOUS_QUOTES_TABLE . " where quoteID='" . $quoteID . "' limit 1");
+			$curl = curl_init();
+			curl_setopt_array($curl, array(
+				CURLOPT_RETURNTRANSFER => 1,
+				CURLOPT_URL => '127.0.0.1:8000/quote/'.$quoteID
+			));
+
+			$resp = curl_exec($curl);
+			curl_close($curl);
+
+			$data = json_decode($resp);
 			
 			//bad feedback
 			if ( empty($data) ) {
 				?><div id="message" class="error"><p><?php _e('Something is wrong. I can\'t find a quote linked up with that ID.','famous-quotes') ?></p></div><?php
 				return;
 			}
-			$data = $data[0];
+			// $data = $data[0];
 			
 			//encode strings
-			if ( !empty($data) ) $quote = htmlspecialchars($data->quote); 
-			if ( !empty($data) ) $author = htmlspecialchars($data->author);		
+			if ( !empty($data) ) $quote = htmlspecialchars($data->quoteContent); 
+			if ( !empty($data) ) $author = htmlspecialchars($data->author->authorName);		
 			
 			//make the edit form
 			$styleborder = 'style="border:1px solid #ccc"';
@@ -105,7 +113,7 @@ function famous_manage() {
 			
 				<p><!--<label><?php _e('Quote:','famous-quotes') ?></label><br />-->
                 <div style="float:left"><script type="text/javascript">edToolbar();</script></div>
-                <div style="float:right; display:compact;margin-top:12px"><small><?php _e('To insert this quote in a post use:','famous-quotes'); ?> <code>[quote id=<?php echo $quoteID ?>]</code></small></div>
+                
                 <textarea id="qeditor" name="quote_quote" <?php echo $styletextarea ?> cols=68 rows=7><?php echo $quote; ?></textarea></p>
 				<script type="text/javascript">var edCanvas = document.getElementById('qeditor');</script>
                 <p class="setting-description"><small><?php _e('* Other than the few offered in the toolbar above, many HTML and non-HTML formatting elements can be used for the quote. Lines can be broken traditionally or using <code>&lt;br/&gt;</code>, etcetera.','famous-quotes'); ?></small></p></p>
@@ -150,21 +158,26 @@ function famous_manage() {
 			
 			else {		
 				//update the quote
-				$sql = "UPDATE " . WP_FAMOUS_QUOTES_TABLE 
-				. " SET `quote`='" . ($quote)
-				. "', `author`='" . ($author) 
-				. "' WHERE `quoteID`='" . $quoteID . "'";		     
-				$wpdb->get_results($sql);
-				
-				//verify what has been udpated
-				$sql = "SELECT `quoteID` FROM " . WP_FAMOUS_QUOTES_TABLE 
-				. " WHERE `quote`='" . $quote 
-				. "' AND `author`='" . $author 
-				. "' LIMIT 1";
-				$result = $wpdb->get_results($sql);
+				$curl = curl_init();
+				//Set some options
+				curl_setopt_array($curl, array(
+					CURLOPT_RETURNTRANSFER => 1,
+					CURLOPT_URL => '127.0.0.1:8000/quote/'.$quoteID,
+					CURLOPT_CUSTOMREQUEST => 'PUT',
+					CURLOPT_POSTFIELDS => http_build_query(
+						array(
+							authorName => $author,
+							quoteContent => $quote,
+						)
+					)
+				));
+
+				$resp = curl_exec($curl);
+				curl_close($curl);
+				$resp = json_decode($resp);
 				
 				//feedback
-				if ( empty($result) || empty($result[0]->quoteID) )	{			
+				if ( empty($resp->status) || $resp->status != 'success' )	{			
 					?><div id="message" class="error fade"><?php echo $wrongmessage ?></div><?php				
 				}
 				else {			
@@ -177,17 +190,26 @@ function famous_manage() {
 		//action: delete quote
 		else if ( $action == 'delete' ) {
 			
-			$sql = "delete from `" . WP_FAMOUS_QUOTES_TABLE . "` where quoteID='" . $quoteID . "'";
-			$wpdb->get_results($sql);
+			//delete a quote
+
+			$curl = curl_init();
+			//Set some options
+			curl_setopt_array($curl, array(
+				CURLOPT_RETURNTRANSFER => 1,
+				CURLOPT_URL => '127.0.0.1:8000/quote/'.$quoteID,
+				CURLOPT_CUSTOMREQUEST => 'DELETE',
+			));
+
+			$resp = curl_exec($curl);
+
+			curl_close($curl);
+			$resp = json_decode($resp);
 			
-			$sql = "select quoteID from `" . WP_FAMOUS_QUOTES_TABLE . "` where quoteID='" . $quoteID . "'";
-			$result = $wpdb->get_results($sql);
-			
-			if ( empty($result) || empty($result[0]->quoteID) )	{			
+			if ( !empty($resp->status) && $resp->status == 'success' )	{			
 				?><div class="updated"><p><?php echo str_replace("%s",$quoteID,__('Quote <strong>%s</strong> deleted.','famous-quotes')); ?></p></div><?php
 			}			
 			else {						
-				?><div class="error fade"><?php echo $wrongmessage ?></div><?php	
+				?><div class="error fade"><?php echo $resp ?></div><?php	
 			}		
 		}
 
@@ -276,13 +298,18 @@ function famous_manage() {
 		}		
 	
 		//get all the quotes
-		$sql = "SELECT `quoteID`,`quote`,`author` FROM " 
-		. WP_FAMOUS_QUOTES_TABLE 
-		. $where
-		. " ORDER BY `". $orderby ."`"
-		. $sort ;
-		
-		$quotes = $wpdb->get_results($sql);
+
+		$curl = curl_init();
+		curl_setopt_array($curl, array(
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_URL => '127.0.0.1:8000/quote'
+		));
+
+		$resp = curl_exec($curl);
+
+		curl_close($curl);
+
+		$quotes = json_decode($resp);
 		
 		//page number has to be reset to 1 otherwise it would look like you have no quotes left when you are on a page too high for so many quotes.
 		$urlrows = querystrings($urlaction, 'qp', '1');
@@ -354,18 +381,18 @@ function famous_manage() {
 				$alt = ($i % 2 == 0) ? ' class="alternate"' : ''; ?>		
 				<tr <?php echo($alt); ?> <?php if( $quote->user != $current_user->user_nicename ) echo ' style="color:#aaa"' ?> >
 					
-					<th scope="row"><?php echo ($quote->quoteID); ?></th>
-					<td><?php echo(nl2br($quote->quote)); ?></td>
-					<td><?php echo($quote->author); ?></td>
+					<th scope="row"><?php echo ($quote->id); ?></th>
+					<td><?php echo(nl2br($quote->quoteContent)); ?></td>
+					<td><?php echo($quote->author->authorName); ?></td>
 										
 					<td align="center">
-					<a href="<?php echo querystrings( querystrings($urlaction, 'qa', 'edit'), 'qi', $quote->quoteID ); ?>">
+					<a href="<?php echo querystrings( querystrings($urlaction, 'qa', 'edit'), 'qi', $quote->id ); ?>">
 					<?php _e('Edit','famous-quotes') ?></a></td>
 	
 					<td align="center">
 					<a href="
-					<?php echo querystrings( querystrings($urlaction, 'qa', 'delete'), 'qi', $quote->quoteID );  ?>"
-					onclick="if ( confirm('<?php echo __( 'You are about to delete quote ','famous-quotes') . $quote->quoteID . '.\\n\\\'' . __('Cancel','famous-quotes') . '\\\' ' . __('to stop','famous-quotes') . ', \\\'OK\\\' ' . __('to delete','famous-quotes') . '.\''; ?>) ) { return true;}return false;"><?php echo __('Delete','famous-quotes') ?></a></td>			
+					<?php echo querystrings( querystrings($urlaction, 'qa', 'delete'), 'qi', $quote->id );  ?>"
+					onclick="if ( confirm('<?php echo __( 'You are about to delete quote ','famous-quotes') . $quote->id . '.\\n\\\'' . __('Cancel','famous-quotes') . '\\\' ' . __('to stop','famous-quotes') . ', \\\'OK\\\' ' . __('to delete','famous-quotes') . '.\''; ?>) ) { return true;}return false;"><?php echo __('Delete','famous-quotes') ?></a></td>			
                     
                     <?php if(current_user_can('manage_options') && $quotesoptions['famous_multiuser'] == true) { ?>
 					<td><?php if( $quote->user == $current_user->user_nicename )echo ''; else echo $quote->user; ?></td>
