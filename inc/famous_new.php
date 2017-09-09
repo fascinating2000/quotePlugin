@@ -58,12 +58,12 @@ function famous_new() {
 		));
 
 		$resp = curl_exec($curl);
-
+		$statusCode = curl_getinfo($curl)['http_code'];
 		curl_close($curl);
 		$resp = json_decode($resp);
 
 		//failure message
-		if ( !empty($resp->status) && $resp->status != 'success' )	{
+		if ( !empty($statusCode) && $statusCode != 200 )	{
 			?><div class="error fade"><p><?php _e('<strong>Failure:</strong> Something went wrong when trying to insert the quote. Try again?',
 			'famous-quotes'); ?></p></div><?php				
 		}

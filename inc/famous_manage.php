@@ -173,11 +173,12 @@ function famous_manage() {
 				));
 
 				$resp = curl_exec($curl);
+				$statusCode = curl_getinfo($curl)['http_code'];
 				curl_close($curl);
 				$resp = json_decode($resp);
 				
 				//feedback
-				if ( empty($resp->status) || $resp->status != 'success' )	{			
+				if ( empty($statusCode) || $statusCode != 200 )	{			
 					?><div id="message" class="error fade"><?php echo $wrongmessage ?></div><?php				
 				}
 				else {			
@@ -201,11 +202,11 @@ function famous_manage() {
 			));
 
 			$resp = curl_exec($curl);
-
+			$statusCode = curl_getinfo($curl)['http_code'];
 			curl_close($curl);
 			$resp = json_decode($resp);
 			
-			if ( !empty($resp->status) && $resp->status == 'success' )	{			
+			if ( !empty($statusCode) && $statusCode == 200 )	{			
 				?><div class="updated"><p><?php echo str_replace("%s",$quoteID,__('Quote <strong>%s</strong> deleted.','famous-quotes')); ?></p></div><?php
 			}			
 			else {						
